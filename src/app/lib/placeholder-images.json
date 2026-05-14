@@ -1,0 +1,10 @@
+{
+  "placeholderImages": [
+    {
+      "id": "cricket-pitch",
+      "description": "Aerial view of a professional cricket stadium pitch",
+      "imageUrl": "https://picsum.photos/seed/cricket1/1200/800",
+      "imageHint": "cricket stadium"
+    }
+  ]
+}
