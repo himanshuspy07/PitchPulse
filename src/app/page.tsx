@@ -7,18 +7,18 @@ import {
   RefreshCw, 
   Play, 
   Zap, 
-  ChevronRight, 
-  ChevronLeft,
   Activity,
   User,
-  Info
+  Info,
+  ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   generateBallResult, 
   BallResult, 
-  OUTCOME_POOL 
+  MatchFormat,
+  MATCH_FORMAT_CONFIGS
 } from "@/app/lib/game-engine";
 import { cn } from "@/lib/utils";
 import { 
@@ -28,10 +28,18 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from "@/components/ui/dialog";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 
 export default function PitchPulse() {
+  const [matchFormat, setMatchFormat] = useState<MatchFormat>('T20');
   const [score, setScore] = useState(0);
   const [wickets, setWickets] = useState(0);
   const [balls, setBalls] = useState(0);
@@ -42,16 +50,20 @@ export default function PitchPulse() {
   const [isFreeHit, setIsFreeHit] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
   
-  // Custom probabilities
-  const [weights, setWeights] = useState({
-    wicket: 5,
-    extra: 6
+  const [weights, setWeights] = useState<{ wicket: number | null, extra: number | null }>({
+    wicket: null,
+    extra: null
   });
 
   const bowl = useCallback(() => {
     if (isGameOver) return;
 
-    const result = generateBallResult(isFreeHit, weights);
+    const engineWeights = {
+      wicket: weights.wicket ?? MATCH_FORMAT_CONFIGS[matchFormat].wicketWeight,
+      extra: weights.extra ?? MATCH_FORMAT_CONFIGS[matchFormat].extraWeight
+    };
+
+    const result = generateBallResult(matchFormat, isFreeHit, engineWeights);
     
     setLastResult(result);
     setHistory((prev) => [result, ...prev].slice(0, 50));
@@ -72,23 +84,30 @@ export default function PitchPulse() {
     
     if (result.isLegal) {
       setBalls((prev) => prev + 1);
+      const currentOvers = Math.floor((balls + 1) / 6);
+      if (matchFormat !== 'TEST' && currentOvers >= MATCH_FORMAT_CONFIGS[matchFormat].maxOvers) {
+        setIsGameOver(true);
+      }
     }
 
-    // Free hit logic
     if (result.value === 'NB') {
       setIsFreeHit(true);
     } else {
       setIsFreeHit(false);
     }
-  }, [isFreeHit, weights, isGameOver, wickets]);
+  }, [isFreeHit, weights, isGameOver, wickets, matchFormat, balls]);
 
   const simulateOver = useCallback(() => {
     if (isGameOver) return;
-    let legalBalls = 0;
-    while (legalBalls < 6 && !isGameOver) {
-      bowl();
-      legalBalls++;
-    }
+    let ballsBowledThisOver = 0;
+    const interval = setInterval(() => {
+      if (ballsBowledThisOver < 6 && !isGameOver) {
+        bowl();
+        ballsBowledThisOver++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 150);
   }, [bowl, isGameOver]);
 
   const resetGame = () => {
@@ -101,6 +120,12 @@ export default function PitchPulse() {
     setIsFreeHit(false);
     setIsGameOver(false);
     setIsWicketFlash(false);
+  };
+
+  const handleFormatChange = (value: MatchFormat) => {
+    setMatchFormat(value);
+    setWeights({ wicket: null, extra: null }); // Reset custom weights to format defaults
+    resetGame();
   };
 
   useEffect(() => {
@@ -119,18 +144,20 @@ export default function PitchPulse() {
   const strikeRate = balls > 0 ? ((score / balls) * 100).toFixed(2) : "0.00";
   const boundaries = history.filter(h => h.isBoundary).length;
 
+  const currentConfig = MATCH_FORMAT_CONFIGS[matchFormat];
+  const displayWicketWeight = weights.wicket ?? currentConfig.wicketWeight;
+  const displayExtraWeight = weights.extra ?? currentConfig.extraWeight;
+
   return (
     <div className={cn(
       "min-h-screen transition-colors duration-500 flex flex-col items-center p-4 md:p-8 relative overflow-hidden",
       isWicketFlash ? "bg-red-950/20" : ""
     )}>
-      {/* Background Strobe for Wickets */}
       {isWicketFlash && (
         <div className="fixed inset-0 z-0 wicket-flash pointer-events-none" />
       )}
 
-      {/* Header */}
-      <header className="w-full max-w-5xl flex justify-between items-center mb-12 z-10">
+      <header className="w-full max-w-5xl flex flex-col md:flex-row gap-4 justify-between items-center mb-12 z-10">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-primary rounded-xl rotate-12 shadow-lg shadow-primary/20">
             <Zap className="w-6 h-6 text-primary-foreground fill-primary-foreground" />
@@ -140,44 +167,60 @@ export default function PitchPulse() {
           </h1>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2 justify-center">
+          <Select value={matchFormat} onValueChange={handleFormatChange}>
+            <SelectTrigger className="w-[140px] rounded-full bg-white/5 border-white/10 text-white font-medium focus:ring-primary">
+              <SelectValue placeholder="Format" />
+            </SelectTrigger>
+            <SelectContent className="bg-card border-white/10 text-white">
+              <SelectItem value="T20">T20 (20 Overs)</SelectItem>
+              <SelectItem value="ODI">ODI (50 Overs)</SelectItem>
+              <SelectItem value="TEST">TEST (Unlimited)</SelectItem>
+            </SelectContent>
+          </Select>
+
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" size="icon" className="rounded-full border-white/10 bg-white/5 hover:bg-white/10">
                 <Settings className="w-4 h-4 text-accent" />
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-white/10">
+            <DialogContent className="bg-card border-white/10 text-white">
               <DialogHeader>
-                <DialogTitle className="font-headline text-2xl">Probability Engine</DialogTitle>
+                <DialogTitle className="font-headline text-2xl">Probability Engine ({matchFormat})</DialogTitle>
               </DialogHeader>
               <div className="space-y-8 py-4">
                 <div className="space-y-4">
                   <div className="flex justify-between">
                     <Label className="text-muted-foreground">Wicket Probability (%)</Label>
-                    <span className="text-primary font-mono">{weights.wicket}%</span>
+                    <span className="text-primary font-mono">{displayWicketWeight}%</span>
                   </div>
                   <Slider 
-                    value={[weights.wicket]} 
+                    value={[displayWicketWeight]} 
                     onValueChange={(v) => setWeights(prev => ({ ...prev, wicket: v[0] }))}
                     max={20}
-                    step={0.5}
+                    step={0.1}
                     className="cursor-pointer"
                   />
+                  <p className="text-[10px] text-muted-foreground italic">Default for {matchFormat}: {currentConfig.wicketWeight}%</p>
                 </div>
                 <div className="space-y-4">
                   <div className="flex justify-between">
                     <Label className="text-muted-foreground">Extra Probability (%)</Label>
-                    <span className="text-primary font-mono">{weights.extra}%</span>
+                    <span className="text-primary font-mono">{displayExtraWeight}%</span>
                   </div>
                   <Slider 
-                    value={[weights.extra]} 
+                    value={[displayExtraWeight]} 
                     onValueChange={(v) => setWeights(prev => ({ ...prev, extra: v[0] }))}
                     max={20}
-                    step={0.5}
+                    step={0.1}
                     className="cursor-pointer"
                   />
+                  <p className="text-[10px] text-muted-foreground italic">Default for {matchFormat}: {currentConfig.extraWeight}%</p>
                 </div>
+                <Button variant="ghost" className="w-full text-xs" onClick={() => setWeights({ wicket: null, extra: null })}>
+                  Reset to Format Defaults
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -189,17 +232,13 @@ export default function PitchPulse() {
             className="rounded-full border-white/10 bg-white/5 hover:bg-white/10 font-medium"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
-            New Innings
+            Restart
           </Button>
         </div>
       </header>
 
       <main className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-3 gap-8 z-10">
-        
-        {/* Main Display Area */}
         <div className="lg:col-span-2 space-y-8">
-          
-          {/* Latest Ball Hero Card */}
           <Card className="bg-gradient-to-br from-card to-background border-white/5 shadow-2xl relative overflow-hidden h-[300px] flex items-center justify-center">
             <div className="absolute inset-0 opacity-10 pointer-events-none">
               <svg className="w-full h-full" viewBox="0 0 100 100">
@@ -235,6 +274,7 @@ export default function PitchPulse() {
               <div className="text-center space-y-4 text-muted-foreground/30">
                 <Play className="w-20 h-20 mx-auto" />
                 <p className="text-xl font-headline uppercase tracking-widest">Awaiting First Ball</p>
+                <p className="text-xs uppercase tracking-widest">Format: {matchFormat}</p>
               </div>
             )}
 
@@ -243,7 +283,9 @@ export default function PitchPulse() {
                 <Trophy className="w-16 h-16 text-accent mb-2" />
                 <h2 className="text-4xl font-headline font-bold">Innings Complete</h2>
                 <p className="text-2xl font-mono text-primary">{score} / {wickets}</p>
-                <p className="text-muted-foreground max-w-xs">All out! The innings has come to a close after a fierce battle.</p>
+                <p className="text-muted-foreground max-w-xs">
+                  {wickets >= 10 ? "All out!" : "Maximum overs reached."} The innings has come to a close.
+                </p>
                 <Button onClick={resetGame} size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl">
                   Play Again
                 </Button>
@@ -251,19 +293,18 @@ export default function PitchPulse() {
             )}
           </Card>
 
-          {/* Controls */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Button 
               size="lg" 
               onClick={bowl} 
               disabled={isGameOver}
-              className="h-20 text-2xl font-headline font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl shadow-primary/20 rounded-2xl group"
+              className="h-20 text-2xl font-headline font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl shadow-primary/20 rounded-2xl group relative overflow-hidden"
             >
               <div className="flex items-center gap-3">
                 <Play className="w-6 h-6 group-hover:scale-110 transition-transform" />
                 BOWL NEXT BALL
               </div>
-              <span className="absolute bottom-2 right-4 text-[10px] uppercase tracking-tighter opacity-50 hidden md:block">Press Space</span>
+              <span className="absolute bottom-2 right-4 text-[10px] uppercase tracking-tighter opacity-50 hidden md:block">Space</span>
             </Button>
             <Button 
               size="lg" 
@@ -279,11 +320,10 @@ export default function PitchPulse() {
             </Button>
           </div>
 
-          {/* Recent Balls Strip */}
           <Card className="bg-white/5 border-white/5 overflow-hidden">
             <CardHeader className="py-4 px-6 flex flex-row items-center justify-between border-b border-white/5">
               <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Recent Deliveries</CardTitle>
-              <div className="text-xs font-mono text-primary/60">{history.length} balls bowled</div>
+              <div className="text-xs font-mono text-primary/60">{history.length} balls</div>
             </CardHeader>
             <CardContent className="p-4 flex gap-3 overflow-x-auto no-scrollbar">
               {history.length > 0 ? history.map((h, i) => (
@@ -299,19 +339,16 @@ export default function PitchPulse() {
                   {h.value}
                 </div>
               )) : (
-                <div className="text-muted-foreground/30 text-xs py-2 italic">Waiting for bowling action...</div>
+                <div className="text-muted-foreground/30 text-xs py-2 italic">Waiting for action...</div>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Statistics Sidebar */}
         <div className="space-y-6">
-          
-          {/* Main Scorecard */}
           <Card className="bg-card border-white/5 shadow-xl">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium uppercase tracking-widest text-primary">Innings Progress</CardTitle>
+              <CardTitle className="text-sm font-medium uppercase tracking-widest text-primary">{matchFormat} Progress</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex justify-between items-baseline">
@@ -323,7 +360,10 @@ export default function PitchPulse() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-white/5 rounded-xl border border-white/5">
                   <p className="text-[10px] uppercase text-muted-foreground mb-1">Overs</p>
-                  <p className="text-xl font-headline font-bold">{overs}.{ballsInOver}</p>
+                  <p className="text-xl font-headline font-bold">
+                    {overs}.{ballsInOver}
+                    {matchFormat !== 'TEST' && <span className="text-xs text-muted-foreground ml-1">/ {currentConfig.maxOvers}</span>}
+                  </p>
                 </div>
                 <div className="p-3 bg-white/5 rounded-xl border border-white/5">
                   <p className="text-[10px] uppercase text-muted-foreground mb-1">Extras</p>
@@ -341,53 +381,49 @@ export default function PitchPulse() {
             </CardContent>
           </Card>
 
-          {/* Probability Insights */}
           <Card className="bg-white/5 border-white/5">
             <CardHeader className="py-4">
               <CardTitle className="text-xs uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
                 <Info className="w-3 h-3" />
-                Outcome Pool
+                Format Intelligence
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 pb-6">
               <div className="space-y-2">
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Base Runs</span>
-                  <span className="font-mono text-primary">High</span>
+                  <span className="text-muted-foreground">Aggression Level</span>
+                  <span className={cn(
+                    "font-mono",
+                    matchFormat === 'T20' ? "text-primary" : matchFormat === 'ODI' ? "text-accent" : "text-muted-foreground"
+                  )}>
+                    {matchFormat === 'T20' ? 'Extreme' : matchFormat === 'ODI' ? 'High' : 'Low'}
+                  </span>
                 </div>
                 <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                  <div className="h-full bg-primary/40 w-[85%]"></div>
+                  <div className="h-full bg-primary/40" style={{ width: matchFormat === 'T20' ? '90%' : matchFormat === 'ODI' ? '60%' : '20%' }}></div>
                 </div>
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Wickets</span>
-                  <span className="font-mono text-destructive">{weights.wicket}%</span>
+                  <span className="text-muted-foreground">Wicket Danger</span>
+                  <span className="font-mono text-destructive">{displayWicketWeight}%</span>
                 </div>
                 <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                  <div className="h-full bg-destructive/40" style={{ width: `${weights.wicket * 5}%` }}></div>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Extras</span>
-                  <span className="font-mono text-accent">{weights.extra}%</span>
-                </div>
-                <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                  <div className="h-full bg-accent/40" style={{ width: `${weights.extra * 5}%` }}></div>
+                  <div className="h-full bg-destructive/40" style={{ width: `${displayWicketWeight * 5}%` }}></div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Team Info / Flavor */}
           <div className="p-4 bg-primary/10 border border-primary/20 rounded-2xl flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
               <User className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <p className="text-xs text-primary font-bold uppercase tracking-widest">Active Batter</p>
-              <h4 className="font-headline font-bold text-lg">Virtual XI Opener</h4>
+              <p className="text-xs text-primary font-bold uppercase tracking-widest">Batter Strategy</p>
+              <h4 className="font-headline font-bold text-lg">
+                {matchFormat === 'T20' ? 'Power Hitting' : matchFormat === 'ODI' ? 'Steady Builder' : 'Defense Mode'}
+              </h4>
             </div>
           </div>
         </div>
