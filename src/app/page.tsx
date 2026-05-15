@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { 
   Trophy, 
@@ -18,7 +18,8 @@ import {
   ChevronRight,
   TrendingUp,
   Dices,
-  Hash
+  Hash,
+  Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -50,6 +51,96 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlaceHolderImages } from "@/app/lib/placeholder-images";
 import { Badge } from "@/components/ui/badge";
 
+/**
+ * Simplified Hawkeye Trajectory Component
+ * Visualizes the ball path based on the last result
+ */
+function HawkeyeView({ result }: { result: BallResult | null }) {
+  const [animate, setAnimate] = useState(false);
+
+  useEffect(() => {
+    if (result) {
+      setAnimate(false);
+      const timer = setTimeout(() => setAnimate(true), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [result]);
+
+  if (!result) return null;
+
+  const getPath = () => {
+    // Basic coordinates: 0,100 is bottom left (bowler/deck start), 100,100 is bottom right (boundary)
+    // Stumps at approx x=35
+    if (result.isWicket) {
+      if (result.wicketType === 'Bowled' || result.wicketType === 'LBW') {
+        return "M 0 80 Q 20 95 35 85"; // Hits stumps
+      }
+      return "M 0 80 Q 30 20 60 40"; // Caught / Top edge
+    }
+    
+    if (result.isBoundary) {
+      if (result.value === '6') return "M 0 80 Q 50 -20 100 60"; // High arc
+      return "M 0 80 Q 50 40 100 90"; // Low boundary
+    }
+
+    if (result.runs === 0) return "M 0 80 Q 20 95 35 70 Q 50 85 60 75"; // Dot ball / Blocked
+    
+    return "M 0 80 Q 30 40 80 70"; // Normal runs
+  };
+
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
+      <svg viewBox="0 0 100 100" className="w-full h-full max-w-[400px]">
+        {/* Pitch line */}
+        <line x1="0" y1="95" x2="100" y2="95" stroke="white" strokeWidth="0.5" strokeDasharray="2,2" opacity="0.3" />
+        
+        {/* Stumps Visualization */}
+        <g opacity="0.6">
+          <rect x="34" y="75" width="0.8" height="20" fill="white" />
+          <rect x="35" y="75" width="0.8" height="20" fill="white" />
+          <rect x="36" y="75" width="0.8" height="20" fill="white" />
+          <rect x="34" y="75" width="2.8" height="0.5" fill="white" />
+        </g>
+
+        {/* Ball Path */}
+        <path
+          d={getPath()}
+          fill="none"
+          stroke="url(#grad)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          className={cn(
+            "transition-all duration-700 ease-out",
+            animate ? "stroke-dashoffset-0" : "stroke-dashoffset-100"
+          )}
+          style={{
+            strokeDasharray: 200,
+            strokeDashoffset: animate ? 0 : 200
+          }}
+        />
+
+        {/* Impact/End Point */}
+        {animate && (
+          <circle 
+            cx={result.isWicket && (result.wicketType === 'Bowled' || result.wicketType === 'LBW') ? 35 : (result.isBoundary ? 95 : 60)} 
+            cy={result.isWicket && (result.wicketType === 'Bowled' || result.wicketType === 'LBW') ? 85 : (result.isBoundary ? 70 : 75)} 
+            r="1.5" 
+            fill="hsl(var(--primary))" 
+            className="animate-ping"
+          />
+        )}
+
+        <defs>
+          <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="hsl(var(--primary))" />
+            <stop offset="100%" stopColor={result.isWicket ? "hsl(var(--destructive))" : "hsl(var(--accent))"} />
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+  );
+}
+
 export default function PitchPulse() {
   const [matchFormat, setMatchFormat] = useState<MatchFormat>('T20');
   const [score, setScore] = useState(0);
@@ -68,9 +159,12 @@ export default function PitchPulse() {
     extra: null
   });
 
-  const pitchImage = (PlaceHolderImages && PlaceHolderImages.length > 0) 
-    ? (PlaceHolderImages.find(img => img.id === 'cricket-pitch') || PlaceHolderImages[0])
-    : null;
+  const pitchImage = useMemo(() => {
+    if (PlaceHolderImages && PlaceHolderImages.length > 0) {
+      return (PlaceHolderImages.find(img => img.id === 'cricket-pitch') || PlaceHolderImages[0]);
+    }
+    return null;
+  }, []);
 
   const bowl = useCallback(() => {
     if (isGameOver) return;
@@ -237,6 +331,9 @@ export default function PitchPulse() {
                 <Image src={pitchImage.imageUrl} alt="Pitch" fill className="object-cover" priority />
               </div>
             )}
+            
+            {/* Hawkeye Trajectory Overlay */}
+            <HawkeyeView result={lastResult} />
             
             <div className="relative z-10 text-center space-y-4 px-4">
               {lastResult ? (
@@ -433,24 +530,24 @@ export default function PitchPulse() {
             )}
           </Card>
 
-          {/* Strategy Insight */}
-          <Card className="glass-card p-6 md:p-8 border-none shadow-xl border-l-[6px] md:border-l-[8px] border-accent rounded-2xl md:rounded-3xl relative overflow-hidden">
+          {/* Hawkeye Insights */}
+          <Card className="glass-card p-6 md:p-8 border-none shadow-xl border-l-[6px] md:border-l-[8px] border-primary rounded-2xl md:rounded-3xl relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-[0.03]">
-              <Flame className="w-24 h-24 rotate-12" />
+              <Eye className="w-24 h-24 rotate-12" />
             </div>
             <div className="flex gap-4 md:gap-6 items-start relative z-10">
-              <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-accent/10 flex items-center justify-center shrink-0 border border-accent/20">
-                <Flame className="w-6 h-6 md:w-7 md:h-7 text-accent" />
+              <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
+                <Eye className="w-6 h-6 md:w-7 md:h-7 text-primary" />
               </div>
               <div className="space-y-2 md:space-y-3">
-                <h5 className="text-[11px] md:text-xs font-black uppercase tracking-widest mb-1">Strategy Brief</h5>
+                <h5 className="text-[11px] md:text-xs font-black uppercase tracking-widest mb-1">Hawkeye Analysis</h5>
                 <p className="text-xs md:text-sm text-muted-foreground leading-relaxed font-medium">
-                  {strategy === 'AGGRESSIVE' ? "Aggression set to maximum. Boundary probability spiked by 80%. Defensive vulnerability increased." : 
-                   strategy === 'DEFENSIVE' ? "Prioritizing wicket preservation. Boundary risk minimized. Scoring rate expected to decline." : 
-                   "Balanced rotational play. Finding gaps and keeping the scorecard ticking over with high consistency."}
+                  {lastResult?.isWicket ? "The trajectory analysis confirms a critical breakthrough. The fielding side has gained a massive psychological advantage." : 
+                   lastResult?.isBoundary ? "Exceptional timing detected. The ball's launch angle was optimized for maximum distance." : 
+                   "Standard delivery tracking active. The batter is currently focusing on strike rotation and finding gaps."}
                 </p>
-                <div className="pt-2 flex items-center gap-1 text-[10px] font-black text-accent uppercase group cursor-pointer hover:text-accent/80 transition-colors">
-                  Match Analysis <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                <div className="pt-2 flex items-center gap-1 text-[10px] font-black text-primary uppercase group cursor-pointer hover:text-primary/80 transition-colors">
+                  View Full Replay <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                 </div>
               </div>
             </div>
@@ -471,7 +568,7 @@ export default function PitchPulse() {
             <span className="hover:text-primary cursor-pointer transition-colors">Privacy</span>
           </div>
         </div>
-        <p className="text-[8px] font-bold text-muted-foreground/20 uppercase tracking-[0.5em]">Global Simulator Infrastructure &bull; Active</p>
+        <p className="text-[8px] font-bold text-muted-foreground/20 uppercase tracking-[0.5em]">Global Simulator Infrastructure &bull; Active &bull; Hawkeye v1.0</p>
       </footer>
     </div>
   );
