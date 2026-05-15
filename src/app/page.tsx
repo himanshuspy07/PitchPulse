@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
@@ -52,6 +51,18 @@ import { PlaceHolderImages } from "@/app/lib/placeholder-images";
 import { Badge } from "@/components/ui/badge";
 
 /**
+ * App Icon Component
+ * A consistent brand mark used across the app
+ */
+function BrandIcon({ className }: { className?: string }) {
+  return (
+    <div className={cn("bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/30 flex-shrink-0", className)}>
+      <Flame className="w-[60%] h-[60%] text-white" />
+    </div>
+  );
+}
+
+/**
  * Simplified Hawkeye Trajectory Component
  * Visualizes the ball path based on the last result
  */
@@ -69,32 +80,28 @@ function HawkeyeView({ result }: { result: BallResult | null }) {
   if (!result) return null;
 
   const getPath = () => {
-    // Basic coordinates: 0,100 is bottom left (bowler/deck start), 100,100 is bottom right (boundary)
-    // Stumps at approx x=35
     if (result.isWicket) {
       if (result.wicketType === 'Bowled' || result.wicketType === 'LBW') {
-        return "M 0 80 Q 20 95 35 85"; // Hits stumps
+        return "M 0 80 Q 20 95 35 85";
       }
-      return "M 0 80 Q 30 20 60 40"; // Caught / Top edge
+      return "M 0 80 Q 30 20 60 40";
     }
     
     if (result.isBoundary) {
-      if (result.value === '6') return "M 0 80 Q 50 -20 100 60"; // High arc
-      return "M 0 80 Q 50 40 100 90"; // Low boundary
+      if (result.value === '6') return "M 0 80 Q 50 -20 100 60";
+      return "M 0 80 Q 50 40 100 90";
     }
 
-    if (result.runs === 0) return "M 0 80 Q 20 95 35 70 Q 50 85 60 75"; // Dot ball / Blocked
+    if (result.runs === 0) return "M 0 80 Q 20 95 35 70 Q 50 85 60 75";
     
-    return "M 0 80 Q 30 40 80 70"; // Normal runs
+    return "M 0 80 Q 30 40 80 70";
   };
 
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
       <svg viewBox="0 0 100 100" className="w-full h-full max-w-[400px]">
-        {/* Pitch line */}
         <line x1="0" y1="95" x2="100" y2="95" stroke="white" strokeWidth="0.5" strokeDasharray="2,2" opacity="0.3" />
         
-        {/* Stumps Visualization */}
         <g opacity="0.6">
           <rect x="34" y="75" width="0.8" height="20" fill="white" />
           <rect x="35" y="75" width="0.8" height="20" fill="white" />
@@ -102,7 +109,6 @@ function HawkeyeView({ result }: { result: BallResult | null }) {
           <rect x="34" y="75" width="2.8" height="0.5" fill="white" />
         </g>
 
-        {/* Ball Path */}
         <path
           d={getPath()}
           fill="none"
@@ -119,7 +125,6 @@ function HawkeyeView({ result }: { result: BallResult | null }) {
           }}
         />
 
-        {/* Impact/End Point */}
         {animate && (
           <circle 
             cx={result.isWicket && (result.wicketType === 'Bowled' || result.wicketType === 'LBW') ? 35 : (result.isBoundary ? 95 : 60)} 
@@ -251,9 +256,7 @@ export default function PitchPulse() {
       {/* Header */}
       <header className="w-full max-w-7xl px-4 md:px-6 py-4 md:py-6 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-white/5 bg-card/50 backdrop-blur-2xl sticky top-0 z-40">
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="w-10 h-10 md:w-12 md:h-12 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/30 flex-shrink-0">
-            <Flame className="w-6 h-6 md:w-7 md:h-7 text-white" />
-          </div>
+          <BrandIcon className="w-10 h-10 md:w-12 md:h-12" />
           <div className="flex flex-col">
             <h1 className="text-xl md:text-2xl font-headline font-black tracking-tight leading-none">PITCH<span className="text-primary">PULSE</span></h1>
             <p className="text-[10px] md:text-xs text-muted-foreground uppercase tracking-widest font-bold">Simulator Pro</p>
@@ -273,13 +276,13 @@ export default function PitchPulse() {
           </Select>
           
           <div className="flex items-center gap-1 md:gap-2">
-            <Button variant="ghost" size="icon" onClick={resetGame} className="h-9 w-9 md:h-10 md:w-10 rounded-lg hover:bg-secondary transition-all">
+            <Button variant="ghost" size="icon" onClick={resetGame} aria-label="Reset Match" className="h-9 w-9 md:h-10 md:w-10 rounded-lg hover:bg-secondary transition-all">
               <RotateCcw className="w-4 h-4 md:w-5 md:h-5" />
             </Button>
 
             <Dialog>
               <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10 rounded-lg hover:bg-secondary transition-all">
+                <Button variant="ghost" size="icon" aria-label="Settings" className="h-9 w-9 md:h-10 md:w-10 rounded-lg hover:bg-secondary transition-all">
                   <Settings className="w-4 h-4 md:w-5 md:h-5" />
                 </Button>
               </DialogTrigger>
@@ -320,19 +323,14 @@ export default function PitchPulse() {
       </header>
 
       <main className="w-full max-w-7xl px-4 md:px-6 mt-6 md:mt-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
-        {/* Left Column: Game View & Controls */}
         <div className="lg:col-span-8 space-y-6 md:space-y-8 w-full">
-          
-          {/* Main Display Card */}
           <Card className="glass-card overflow-hidden relative aspect-video flex items-center justify-center border-none shadow-2xl rounded-[1.5rem] md:rounded-[2.5rem]">
             {pitchImage && (
               <div className="absolute inset-0 z-0 opacity-15 grayscale hover:grayscale-0 transition-all duration-1000">
-                <Image src={pitchImage.imageUrl} alt="Pitch" fill className="object-cover" priority />
+                <Image src={pitchImage.imageUrl} alt="Cricket Pitch Stadium" fill className="object-cover" priority />
               </div>
             )}
             
-            {/* Hawkeye Trajectory Overlay */}
             <HawkeyeView result={lastResult} />
             
             <div className="relative z-10 text-center space-y-4 px-4">
@@ -379,7 +377,6 @@ export default function PitchPulse() {
             )}
           </Card>
 
-          {/* Action Zone */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             <Card className="glass-card p-5 md:p-8 border-none shadow-xl rounded-2xl md:rounded-3xl">
               <div className="flex items-center justify-between mb-6">
@@ -442,16 +439,11 @@ export default function PitchPulse() {
               SIM OVER
             </Button>
           </div>
-
         </div>
 
-        {/* Right Column: Stats & History */}
         <div className="lg:col-span-4 space-y-6 md:space-y-8 w-full">
-          
-          {/* Scoreboard Card */}
           <Card className="bg-primary p-6 md:p-8 border-none shadow-2xl rounded-[2rem] md:rounded-[3rem] text-white relative overflow-hidden group">
             <div className="absolute -top-12 -right-12 w-48 h-48 bg-white/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-1000" />
-            
             <div className="relative z-10 flex flex-col gap-6 md:gap-8">
               <div className="flex justify-between items-start">
                 <div>
@@ -462,7 +454,6 @@ export default function PitchPulse() {
                 </div>
                 <Badge className="bg-black/20 text-white border-white/10 text-[9px] md:text-[11px] font-black py-1.5 px-4 rounded-full backdrop-blur-md uppercase tracking-widest">{matchFormat}</Badge>
               </div>
-
               <div className="grid grid-cols-2 gap-3 md:gap-4">
                 <div className="bg-white/10 p-4 md:p-5 rounded-2xl md:rounded-[2rem] backdrop-blur-sm border border-white/5">
                   <p className="text-[9px] md:text-[11px] font-black uppercase tracking-widest opacity-50 mb-2 flex items-center gap-2">
@@ -492,7 +483,6 @@ export default function PitchPulse() {
             </div>
           </Card>
 
-          {/* Recent Deliveries */}
           <Card className="glass-card p-6 md:p-8 border-none shadow-xl rounded-2xl md:rounded-3xl">
             <div className="flex items-center justify-between mb-8">
               <h4 className="text-[10px] md:text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-3">
@@ -500,7 +490,6 @@ export default function PitchPulse() {
               </h4>
               <Badge variant="secondary" className="text-[10px] font-black rounded-lg px-3">{history.length} Balls</Badge>
             </div>
-            
             <div className="flex flex-wrap gap-2.5 md:gap-3">
               {history.length > 0 ? history.map((h, i) => (
                 <div 
@@ -522,7 +511,6 @@ export default function PitchPulse() {
                 </div>
               )}
             </div>
-            
             {history.length > 0 && (
               <Button variant="ghost" className="w-full mt-8 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-all" onClick={() => setHistory([])}>
                 Clear Feed
@@ -530,7 +518,6 @@ export default function PitchPulse() {
             )}
           </Card>
 
-          {/* Hawkeye Insights */}
           <Card className="glass-card p-6 md:p-8 border-none shadow-xl border-l-[6px] md:border-l-[8px] border-primary rounded-2xl md:rounded-3xl relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-[0.03]">
               <Eye className="w-24 h-24 rotate-12" />
@@ -552,7 +539,6 @@ export default function PitchPulse() {
               </div>
             </div>
           </Card>
-
         </div>
       </main>
 
