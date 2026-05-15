@@ -10,7 +10,10 @@ import {
   Activity,
   User,
   Info,
-  ChevronDown
+  Shield,
+  Flame,
+  Target,
+  ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +21,8 @@ import {
   generateBallResult, 
   BallResult, 
   MatchFormat,
-  MATCH_FORMAT_CONFIGS
+  MATCH_FORMAT_CONFIGS,
+  BattingStrategy
 } from "@/app/lib/game-engine";
 import { cn } from "@/lib/utils";
 import { 
@@ -37,6 +41,7 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function PitchPulse() {
   const [matchFormat, setMatchFormat] = useState<MatchFormat>('T20');
@@ -50,6 +55,10 @@ export default function PitchPulse() {
   const [isFreeHit, setIsFreeHit] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
   
+  // Custom Over Controls
+  const [ballsPerOver, setBallsPerOver] = useState(6);
+  const [strategy, setStrategy] = useState<BattingStrategy>('BALANCED');
+  
   const [weights, setWeights] = useState<{ wicket: number | null, extra: number | null }>({
     wicket: null,
     extra: null
@@ -58,12 +67,11 @@ export default function PitchPulse() {
   const bowl = useCallback(() => {
     if (isGameOver) return;
 
-    const engineWeights = {
-      wicket: weights.wicket ?? MATCH_FORMAT_CONFIGS[matchFormat].wicketWeight,
-      extra: weights.extra ?? MATCH_FORMAT_CONFIGS[matchFormat].extraWeight
-    };
-
-    const result = generateBallResult(matchFormat, isFreeHit, engineWeights);
+    const result = generateBallResult(matchFormat, isFreeHit, {
+      wicketWeight: weights.wicket,
+      extraWeight: weights.extra,
+      strategy: strategy
+    });
     
     setLastResult(result);
     setHistory((prev) => [result, ...prev].slice(0, 50));
@@ -95,20 +103,20 @@ export default function PitchPulse() {
     } else {
       setIsFreeHit(false);
     }
-  }, [isFreeHit, weights, isGameOver, wickets, matchFormat, balls]);
+  }, [isFreeHit, weights, isGameOver, wickets, matchFormat, balls, strategy]);
 
   const simulateOver = useCallback(() => {
     if (isGameOver) return;
     let ballsBowledThisOver = 0;
     const interval = setInterval(() => {
-      if (ballsBowledThisOver < 6 && !isGameOver) {
+      if (ballsBowledThisOver < ballsPerOver && !isGameOver) {
         bowl();
         ballsBowledThisOver++;
       } else {
         clearInterval(interval);
       }
     }, 150);
-  }, [bowl, isGameOver]);
+  }, [bowl, isGameOver, ballsPerOver]);
 
   const resetGame = () => {
     setScore(0);
@@ -124,7 +132,7 @@ export default function PitchPulse() {
 
   const handleFormatChange = (value: MatchFormat) => {
     setMatchFormat(value);
-    setWeights({ wicket: null, extra: null }); // Reset custom weights to format defaults
+    setWeights({ wicket: null, extra: null }); 
     resetGame();
   };
 
@@ -293,31 +301,70 @@ export default function PitchPulse() {
             )}
           </Card>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Button 
-              size="lg" 
-              onClick={bowl} 
-              disabled={isGameOver}
-              className="h-20 text-2xl font-headline font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl shadow-primary/20 rounded-2xl group relative overflow-hidden"
-            >
-              <div className="flex items-center gap-3">
-                <Play className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                BOWL NEXT BALL
-              </div>
-              <span className="absolute bottom-2 right-4 text-[10px] uppercase tracking-tighter opacity-50 hidden md:block">Space</span>
-            </Button>
-            <Button 
-              size="lg" 
-              onClick={simulateOver}
-              disabled={isGameOver}
-              variant="secondary"
-              className="h-20 text-xl font-headline font-bold rounded-2xl border border-white/5 hover:bg-secondary/80"
-            >
-              <div className="flex items-center gap-3">
-                <Activity className="w-6 h-6" />
-                SIMULATE OVER
-              </div>
-            </Button>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="bg-white/5 border-white/5 p-4 flex flex-col gap-3">
+                <Label className="text-xs uppercase tracking-widest text-muted-foreground">Next Ball Strategy</Label>
+                <Tabs value={strategy} onValueChange={(v) => setStrategy(v as BattingStrategy)} className="w-full">
+                  <TabsList className="grid grid-cols-3 bg-background w-full">
+                    <TabsTrigger value="DEFENSIVE" className="flex items-center gap-2">
+                      <Shield className="w-3 h-3" />
+                      <span className="hidden sm:inline">Defend</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="BALANCED" className="flex items-center gap-2">
+                      <Target className="w-3 h-3" />
+                      <span className="hidden sm:inline">Normal</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="AGGRESSIVE" className="flex items-center gap-2">
+                      <Flame className="w-3 h-3" />
+                      <span className="hidden sm:inline">Attack</span>
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </Card>
+
+              <Card className="bg-white/5 border-white/5 p-4 flex flex-col gap-3">
+                <div className="flex justify-between items-center">
+                  <Label className="text-xs uppercase tracking-widest text-muted-foreground">Balls in Over</Label>
+                  <span className="text-primary font-mono font-bold">{ballsPerOver}</span>
+                </div>
+                <Slider 
+                  value={[ballsPerOver]} 
+                  onValueChange={(v) => setBallsPerOver(v[0])}
+                  min={1}
+                  max={12}
+                  step={1}
+                  className="cursor-pointer"
+                />
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Button 
+                size="lg" 
+                onClick={bowl} 
+                disabled={isGameOver}
+                className="h-20 text-2xl font-headline font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl shadow-primary/20 rounded-2xl group relative overflow-hidden"
+              >
+                <div className="flex items-center gap-3">
+                  <Play className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                  BOWL BALL
+                </div>
+                <span className="absolute bottom-2 right-4 text-[10px] uppercase tracking-tighter opacity-50 hidden md:block">Space</span>
+              </Button>
+              <Button 
+                size="lg" 
+                onClick={simulateOver}
+                disabled={isGameOver}
+                variant="secondary"
+                className="h-20 text-xl font-headline font-bold rounded-2xl border border-white/5 hover:bg-secondary/80 group"
+              >
+                <div className="flex items-center gap-3">
+                  <Activity className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+                  SIMULATE {ballsPerOver} BALLS
+                </div>
+              </Button>
+            </div>
           </div>
 
           <Card className="bg-white/5 border-white/5 overflow-hidden">
@@ -385,33 +432,32 @@ export default function PitchPulse() {
             <CardHeader className="py-4">
               <CardTitle className="text-xs uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
                 <Info className="w-3 h-3" />
-                Format Intelligence
+                Current Strategy
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 pb-6">
               <div className="space-y-2">
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Aggression Level</span>
+                  <span className="text-muted-foreground">Batter Aggression</span>
                   <span className={cn(
-                    "font-mono",
-                    matchFormat === 'T20' ? "text-primary" : matchFormat === 'ODI' ? "text-accent" : "text-muted-foreground"
+                    "font-mono font-bold",
+                    strategy === 'AGGRESSIVE' ? "text-destructive" : strategy === 'DEFENSIVE' ? "text-accent" : "text-primary"
                   )}>
-                    {matchFormat === 'T20' ? 'Extreme' : matchFormat === 'ODI' ? 'High' : 'Low'}
+                    {strategy}
                   </span>
                 </div>
                 <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                  <div className="h-full bg-primary/40" style={{ width: matchFormat === 'T20' ? '90%' : matchFormat === 'ODI' ? '60%' : '20%' }}></div>
+                  <div className={cn(
+                    "h-full transition-all duration-500",
+                    strategy === 'AGGRESSIVE' ? "bg-destructive" : strategy === 'DEFENSIVE' ? "bg-accent" : "bg-primary"
+                  )} style={{ width: strategy === 'AGGRESSIVE' ? '100%' : strategy === 'BALANCED' ? '50%' : '15%' }}></div>
                 </div>
               </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Wicket Danger</span>
-                  <span className="font-mono text-destructive">{displayWicketWeight}%</span>
-                </div>
-                <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                  <div className="h-full bg-destructive/40" style={{ width: `${displayWicketWeight * 5}%` }}></div>
-                </div>
-              </div>
+              <p className="text-[10px] text-muted-foreground italic leading-relaxed">
+                {strategy === 'AGGRESSIVE' ? "Batter will swing for the fences. Wicket risk is significantly higher." : 
+                 strategy === 'DEFENSIVE' ? "Batter focuses on protecting their wicket. Boundary probability is very low." : 
+                 "Batter will play a standard balanced game according to the match format."}
+              </p>
             </CardContent>
           </Card>
 
@@ -420,9 +466,9 @@ export default function PitchPulse() {
               <User className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <p className="text-xs text-primary font-bold uppercase tracking-widest">Batter Strategy</p>
+              <p className="text-xs text-primary font-bold uppercase tracking-widest">Active Plan</p>
               <h4 className="font-headline font-bold text-lg">
-                {matchFormat === 'T20' ? 'Power Hitting' : matchFormat === 'ODI' ? 'Steady Builder' : 'Defense Mode'}
+                {strategy === 'AGGRESSIVE' ? 'Slog Mode' : strategy === 'DEFENSIVE' ? 'Anchor In' : 'Steady Builder'}
               </h4>
             </div>
           </div>
@@ -430,7 +476,7 @@ export default function PitchPulse() {
       </main>
 
       <footer className="mt-auto pt-12 pb-8 w-full max-w-5xl text-center text-muted-foreground text-xs uppercase tracking-[0.3em]">
-        <p>&copy; 2024 PitchPulse Studio &bull; Pro Cricket Simulation Engine</p>
+        <p>&copy; 2024 PitchPulse Studio &bull; Custom Engine Activated</p>
       </footer>
     </div>
   );

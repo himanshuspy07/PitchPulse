@@ -12,6 +12,7 @@ export interface BallResult {
 }
 
 export type MatchFormat = 'T20' | 'ODI' | 'TEST';
+export type BattingStrategy = 'DEFENSIVE' | 'BALANCED' | 'AGGRESSIVE';
 
 export const MATCH_FORMAT_CONFIGS: Record<MatchFormat, {
   maxOvers: number;
@@ -67,14 +68,36 @@ export const OUTCOME_POOL = {
 export const generateBallResult = (
   format: MatchFormat = 'T20', 
   isFreeHit: boolean = false, 
-  customWeights?: { wicket?: number, extra?: number }
+  options?: { 
+    wicketWeight?: number | null, 
+    extraWeight?: number | null,
+    strategy?: BattingStrategy 
+  }
 ): BallResult => {
   const config = MATCH_FORMAT_CONFIGS[format];
+  
+  // Base values
+  let wicketWeight = options?.wicketWeight ?? config.wicketWeight;
+  let extraWeight = options?.extraWeight ?? config.extraWeight;
+  let runWeights = [...config.runWeights];
+
+  // Strategy Modifiers
+  const strategy = options?.strategy ?? 'BALANCED';
+  if (strategy === 'AGGRESSIVE') {
+    wicketWeight *= 1.6; // Higher risk of out
+    runWeights[0] *= 0.5; // Fewer dots
+    runWeights[4] *= 1.8; // More boundaries
+    runWeights[5] *= 2.5; // More sixes
+  } else if (strategy === 'DEFENSIVE') {
+    wicketWeight *= 0.4; // Lower risk of out
+    runWeights[0] *= 1.5; // More dots
+    runWeights[1] *= 1.2; // Focus on singles
+    runWeights[4] *= 0.2; // Fewer boundaries
+    runWeights[5] *= 0.1; // Almost no sixes
+  }
+
   const roll = Math.random() * 100;
   
-  const wicketWeight = customWeights?.wicket ?? config.wicketWeight;
-  const extraWeight = customWeights?.extra ?? config.extraWeight;
-
   // Wicket check (unless free hit)
   if (!isFreeHit && roll < wicketWeight) {
     const totalWicketWeight = OUTCOME_POOL.WICKETS.reduce((acc, curr) => acc + curr.weight, 0);
@@ -123,17 +146,17 @@ export const generateBallResult = (
     };
   }
 
-  // Runs roll using format-specific weights
-  const totalRunWeight = config.runWeights.reduce((acc, curr) => acc + curr, 0);
+  // Runs roll using (potentially strategy-modified) weights
+  const totalRunWeight = runWeights.reduce((acc, curr) => acc + curr, 0);
   let runRoll = Math.random() * totalRunWeight;
   let selectedRunIndex = 0;
   
-  for (let i = 0; i < config.runWeights.length; i++) {
-    if (runRoll < config.runWeights[i]) {
+  for (let i = 0; i < runWeights.length; i++) {
+    if (runRoll < runWeights[i]) {
       selectedRunIndex = i;
       break;
     }
-    runRoll -= config.runWeights[i];
+    runRoll -= runWeights[i];
   }
 
   const selectedRun = OUTCOME_POOL.RUNS[selectedRunIndex];
