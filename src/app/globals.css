@@ -4,31 +4,31 @@
 
 @layer base {
   :root {
-    --background: 153 22% 10%;
-    --foreground: 0 0% 100%;
-    --card: 153 22% 12%;
-    --card-foreground: 0 0% 100%;
-    --popover: 153 22% 12%;
-    --popover-foreground: 0 0% 100%;
-    --primary: 151 80% 50%;
-    --primary-foreground: 153 22% 5%;
-    --secondary: 153 22% 18%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 153 22% 20%;
-    --muted-foreground: 153 10% 70%;
-    --accent: 89 82% 71%;
-    --accent-foreground: 153 22% 5%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 153 22% 20%;
-    --input: 153 22% 20%;
-    --ring: 151 80% 50%;
-    --radius: 0.75rem;
-    --chart-1: 151 80% 50%;
-    --chart-2: 89 82% 71%;
-    --chart-3: 153 22% 30%;
-    --chart-4: 153 22% 40%;
-    --chart-5: 153 22% 50%;
+    --background: 222 47% 4%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 6%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 6%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 226 100% 64%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 222 47% 12%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 222 47% 15%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 45 93% 47%;
+    --accent-foreground: 222 47% 4%;
+    --destructive: 346 84% 61%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 222 47% 15%;
+    --input: 222 47% 15%;
+    --ring: 226 100% 64%;
+    --radius: 1rem;
+    --chart-1: 226 100% 64%;
+    --chart-2: 142 70% 45%;
+    --chart-3: 45 93% 47%;
+    --chart-4: 346 84% 61%;
+    --chart-5: 199 89% 48%;
   }
 }
 
@@ -37,26 +37,41 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
-    background-image: radial-gradient(circle at 50% 50%, hsl(var(--card)) 0%, hsl(var(--background)) 100%);
+    @apply bg-background text-foreground font-body antialiased;
+    background-image: 
+      radial-gradient(circle at 0% 0%, hsl(var(--primary) / 0.05) 0%, transparent 50%),
+      radial-gradient(circle at 100% 100%, hsl(var(--accent) / 0.05) 0%, transparent 50%);
   }
 }
 
 @keyframes wicket-flash {
-  0% { background-color: transparent; }
-  50% { background-color: rgba(239, 68, 68, 0.4); }
-  100% { background-color: transparent; }
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
-.wicket-flash {
-  animation: wicket-flash 0.5s ease-in-out infinite;
+.wicket-overlay {
+  animation: wicket-flash 0.5s ease-in-out 2;
 }
 
-@keyframes number-pop {
-  0% { transform: scale(0.8); opacity: 0; }
+@keyframes score-pop {
+  0% { transform: scale(0.9); opacity: 0; }
+  50% { transform: scale(1.05); }
   100% { transform: scale(1); opacity: 1; }
 }
 
-.animate-number-pop {
-  animation: number-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+.animate-score-pop {
+  animation: score-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.glass-card {
+  @apply bg-card/60 backdrop-blur-md border border-white/5;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

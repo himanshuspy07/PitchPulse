@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -6,18 +5,19 @@ import Image from "next/image";
 import { 
   Trophy, 
   Settings, 
-  RefreshCw, 
+  RotateCcw, 
   Play, 
   Zap, 
   Activity,
-  User,
-  Info,
+  Target,
   Shield,
   Flame,
-  Target
+  History,
+  Info,
+  ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { 
   generateBallResult, 
   BallResult, 
@@ -44,6 +44,7 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlaceHolderImages } from "@/app/lib/placeholder-images";
+import { Badge } from "@/components/ui/badge";
 
 export default function PitchPulse() {
   const [matchFormat, setMatchFormat] = useState<MatchFormat>('T20');
@@ -56,17 +57,13 @@ export default function PitchPulse() {
   const [isWicketFlash, setIsWicketFlash] = useState(false);
   const [isFreeHit, setIsFreeHit] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
-  
-  // Custom Over Controls
   const [ballsPerOver, setBallsPerOver] = useState(6);
   const [strategy, setStrategy] = useState<BattingStrategy>('BALANCED');
-  
   const [weights, setWeights] = useState<{ wicket: number | null, extra: number | null }>({
     wicket: null,
     extra: null
   });
 
-  // Safely find the pitch image or fallback to the first available image, or null
   const pitchImage = (PlaceHolderImages && PlaceHolderImages.length > 0) 
     ? (PlaceHolderImages.find(img => img.id === 'cricket-pitch') || PlaceHolderImages[0])
     : null;
@@ -82,20 +79,16 @@ export default function PitchPulse() {
     
     setLastResult(result);
     setHistory((prev) => [result, ...prev].slice(0, 50));
-    
     setScore((prev) => prev + result.runs);
+    
     if (result.isWicket) {
       setWickets((prev) => prev + 1);
       setIsWicketFlash(true);
       setTimeout(() => setIsWicketFlash(false), 1000);
-      if (wickets + 1 >= 10) {
-        setIsGameOver(true);
-      }
+      if (wickets + 1 >= 10) setIsGameOver(true);
     }
     
-    if (result.type === 'EXTRA') {
-      setExtras((prev) => prev + result.runs);
-    }
+    if (result.type === 'EXTRA') setExtras((prev) => prev + result.runs);
     
     if (result.isLegal) {
       setBalls((prev) => prev + 1);
@@ -105,24 +98,20 @@ export default function PitchPulse() {
       }
     }
 
-    if (result.value === 'NB') {
-      setIsFreeHit(true);
-    } else {
-      setIsFreeHit(false);
-    }
+    setIsFreeHit(result.value === 'NB');
   }, [isFreeHit, weights, isGameOver, wickets, matchFormat, balls, strategy]);
 
   const simulateOver = useCallback(() => {
     if (isGameOver) return;
-    let ballsBowledThisOver = 0;
+    let b = 0;
     const interval = setInterval(() => {
-      if (ballsBowledThisOver < ballsPerOver && !isGameOver) {
+      if (b < ballsPerOver && !isGameOver) {
         bowl();
-        ballsBowledThisOver++;
+        b++;
       } else {
         clearInterval(interval);
       }
-    }, 150);
+    }, 200);
   }, [bowl, isGameOver, ballsPerOver]);
 
   const resetGame = () => {
@@ -137,12 +126,6 @@ export default function PitchPulse() {
     setIsWicketFlash(false);
   };
 
-  const handleFormatChange = (value: MatchFormat) => {
-    setMatchFormat(value);
-    setWeights({ wicket: null, extra: null }); 
-    resetGame();
-  };
-
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.code === "Space") {
@@ -154,350 +137,293 @@ export default function PitchPulse() {
     return () => window.removeEventListener("keydown", handleKeyPress);
   }, [bowl]);
 
-  const overs = Math.floor(balls / 6);
-  const ballsInOver = balls % 6;
-  const strikeRate = balls > 0 ? ((score / balls) * 100).toFixed(2) : "0.00";
+  const overs = `${Math.floor(balls / 6)}.${balls % 6}`;
   const boundaries = history.filter(h => h.isBoundary).length;
-
   const currentConfig = MATCH_FORMAT_CONFIGS[matchFormat];
-  const displayWicketWeight = weights.wicket ?? currentConfig.wicketWeight;
-  const displayExtraWeight = weights.extra ?? currentConfig.extraWeight;
 
   return (
-    <div className={cn(
-      "min-h-screen transition-colors duration-500 flex flex-col items-center p-4 md:p-8 relative overflow-hidden",
-      isWicketFlash ? "bg-red-950/20" : ""
-    )}>
+    <div className="min-h-screen flex flex-col items-center selection:bg-primary selection:text-white pb-12">
+      {/* Wicket Flash Overlay */}
       {isWicketFlash && (
-        <div className="fixed inset-0 z-0 wicket-flash pointer-events-none" />
+        <div className="fixed inset-0 z-50 bg-destructive/30 backdrop-blur-sm wicket-overlay pointer-events-none flex items-center justify-center">
+          <h2 className="text-8xl font-headline font-black text-white italic tracking-tighter uppercase drop-shadow-2xl">OUT!</h2>
+        </div>
       )}
 
-      <header className="w-full max-w-5xl flex flex-col md:flex-row gap-4 justify-between items-center mb-12 z-10">
+      {/* Header */}
+      <header className="w-full max-w-6xl px-4 py-6 flex flex-col md:flex-row justify-between items-center gap-4 border-b border-white/5 bg-card/30 backdrop-blur-xl sticky top-0 z-40">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary rounded-xl rotate-12 shadow-lg shadow-primary/20">
-            <Zap className="w-6 h-6 text-primary-foreground fill-primary-foreground" />
+          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/30">
+            <Flame className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-3xl font-headline font-bold tracking-tight text-white">
-            Pitch<span className="text-primary">Pulse</span>
-          </h1>
+          <div>
+            <h1 className="text-xl font-headline font-black tracking-tight leading-none">PITCH<span className="text-primary">PULSE</span></h1>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Simulator Pro</p>
+          </div>
         </div>
-        
-        <div className="flex flex-wrap items-center gap-2 justify-center">
-          <Select value={matchFormat} onValueChange={handleFormatChange}>
-            <SelectTrigger className="w-[140px] rounded-full bg-white/5 border-white/10 text-white font-medium focus:ring-primary">
-              <SelectValue placeholder="Format" />
+
+        <div className="flex items-center gap-3">
+          <Select value={matchFormat} onValueChange={(v) => { setMatchFormat(v as MatchFormat); resetGame(); }}>
+            <SelectTrigger className="w-32 h-9 rounded-lg bg-secondary border-none text-xs font-bold uppercase">
+              <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-card border-white/10 text-white">
-              <SelectItem value="T20">T20 (20 Overs)</SelectItem>
-              <SelectItem value="ODI">ODI (50 Overs)</SelectItem>
-              <SelectItem value="TEST">TEST (Unlimited)</SelectItem>
+            <SelectContent>
+              <SelectItem value="T20">T20 International</SelectItem>
+              <SelectItem value="ODI">One Day Intl</SelectItem>
+              <SelectItem value="TEST">Test Match</SelectItem>
             </SelectContent>
           </Select>
+          
+          <Button variant="ghost" size="icon" onClick={resetGame} className="h-9 w-9 rounded-lg hover:bg-secondary">
+            <RotateCcw className="w-4 h-4" />
+          </Button>
 
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline" size="icon" className="rounded-full border-white/10 bg-white/5 hover:bg-white/10">
-                <Settings className="w-4 h-4 text-accent" />
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg hover:bg-secondary">
+                <Settings className="w-4 h-4" />
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-white/10 text-white">
-              <DialogHeader>
-                <DialogTitle className="font-headline text-2xl">Probability Engine ({matchFormat})</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-8 py-4">
-                <div className="space-y-4">
-                  <div className="flex justify-between">
-                    <Label className="text-muted-foreground">Wicket Probability (%)</Label>
-                    <span className="text-primary font-mono">{displayWicketWeight}%</span>
-                  </div>
-                  <Slider 
-                    value={[displayWicketWeight]} 
-                    onValueChange={(v) => setWeights(prev => ({ ...prev, wicket: v[0] }))}
-                    max={20}
-                    step={0.1}
-                    className="cursor-pointer"
-                  />
-                  <p className="text-[10px] text-muted-foreground italic">Default for {matchFormat}: {currentConfig.wicketWeight}%</p>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Simulation Settings</DialogTitle></DialogHeader>
+              <div className="space-y-6 py-4">
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm"><Label>Wicket Chance</Label><span className="font-mono text-primary">{(weights.wicket ?? currentConfig.wicketWeight).toFixed(1)}%</span></div>
+                  <Slider value={[weights.wicket ?? currentConfig.wicketWeight]} onValueChange={v => setWeights(p => ({...p, wicket: v[0]}))} max={20} step={0.1} />
                 </div>
-                <div className="space-y-4">
-                  <div className="flex justify-between">
-                    <Label className="text-muted-foreground">Extra Probability (%)</Label>
-                    <span className="text-primary font-mono">{displayExtraWeight}%</span>
-                  </div>
-                  <Slider 
-                    value={[displayExtraWeight]} 
-                    onValueChange={(v) => setWeights(prev => ({ ...prev, extra: v[0] }))}
-                    max={20}
-                    step={0.1}
-                    className="cursor-pointer"
-                  />
-                  <p className="text-[10px] text-muted-foreground italic">Default for {matchFormat}: {currentConfig.extraWeight}%</p>
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm"><Label>Extras Chance</Label><span className="font-mono text-primary">{(weights.extra ?? currentConfig.extraWeight).toFixed(1)}%</span></div>
+                  <Slider value={[weights.extra ?? currentConfig.extraWeight]} onValueChange={v => setWeights(p => ({...p, extra: v[0]}))} max={20} step={0.1} />
                 </div>
-                <Button variant="ghost" className="w-full text-xs" onClick={() => setWeights({ wicket: null, extra: null })}>
-                  Reset to Format Defaults
-                </Button>
+                <Button variant="outline" className="w-full text-xs" onClick={() => setWeights({ wicket: null, extra: null })}>Reset to Format Defaults</Button>
               </div>
             </DialogContent>
           </Dialog>
-          
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={resetGame}
-            className="rounded-full border-white/10 bg-white/5 hover:bg-white/10 font-medium"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Restart
-          </Button>
         </div>
       </header>
 
-      <main className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-3 gap-8 z-10">
-        <div className="lg:col-span-2 space-y-8">
-          <Card className="bg-card border-white/5 shadow-2xl relative overflow-hidden h-[300px] flex items-center justify-center">
+      <main className="w-full max-w-6xl px-4 mt-8 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* Left Column: Game View & Controls */}
+        <div className="lg:col-span-8 space-y-6">
+          
+          {/* Main Display Card */}
+          <Card className="glass-card overflow-hidden relative aspect-video flex items-center justify-center border-none shadow-2xl">
             {pitchImage && (
-              <div className="absolute inset-0 z-0 opacity-20 transition-opacity duration-1000">
-                <Image 
-                  src={pitchImage.imageUrl} 
-                  alt={pitchImage.description}
-                  fill
-                  className="object-cover"
-                  data-ai-hint={pitchImage.imageHint}
-                />
+              <div className="absolute inset-0 z-0 opacity-10">
+                <Image src={pitchImage.imageUrl} alt="Pitch" fill className="object-cover" />
               </div>
             )}
             
-            <div className="absolute inset-0 z-0 opacity-10 pointer-events-none">
-              <svg className="w-full h-full" viewBox="0 0 100 100">
-                <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-                  <path d="M 10 0 L 0 0 0 10" fill="none" stroke="white" strokeWidth="0.5"/>
-                </pattern>
-                <rect width="100" height="100" fill="url(#grid)" />
-              </svg>
-            </div>
-
-            <div className="relative z-10 w-full">
+            <div className="relative z-10 text-center space-y-4">
               {lastResult ? (
-                <div className="text-center space-y-4 animate-number-pop">
-                  <div className={cn(
-                    "text-9xl font-headline font-black tracking-tighter drop-shadow-2xl",
-                    lastResult.isWicket ? "text-destructive" : "text-primary",
-                    lastResult.isBoundary ? "text-accent" : ""
+                <div className="animate-score-pop">
+                  <h2 className={cn(
+                    "text-[10rem] font-headline font-black leading-none italic tracking-tighter drop-shadow-2xl",
+                    lastResult.isWicket ? "text-destructive" : lastResult.isBoundary ? "text-accent" : "text-emerald-400"
                   )}>
                     {lastResult.value}
+                  </h2>
+                  <div className="flex items-center justify-center gap-2">
+                    <Badge variant="outline" className="bg-background/50 backdrop-blur-md uppercase tracking-[0.2em] font-bold py-1 px-4">
+                      {lastResult.isWicket ? lastResult.wicketType : lastResult.extraType || (lastResult.isBoundary ? "Spectacular Shot" : "Fair Delivery")}
+                    </Badge>
                   </div>
-                  <p className="text-xl text-muted-foreground font-medium uppercase tracking-widest">
-                    {lastResult.isWicket ? lastResult.wicketType : 
-                    lastResult.extraType ? lastResult.extraType : 
-                    lastResult.isBoundary ? "Spectacular Boundary!" : "Clean Delivery"}
-                  </p>
-                  {isFreeHit && (
-                    <div className="inline-flex items-center gap-2 bg-accent/20 text-accent px-4 py-1.5 rounded-full text-sm font-bold uppercase animate-pulse">
-                      <Zap className="w-4 h-4 fill-accent" />
-                      Free Hit
-                    </div>
-                  )}
                 </div>
               ) : (
-                <div className="text-center space-y-4 text-muted-foreground/30">
-                  <Play className="w-20 h-20 mx-auto" />
-                  <p className="text-xl font-headline uppercase tracking-widest">Awaiting First Ball</p>
-                  <p className="text-xs uppercase tracking-widest">Format: {matchFormat}</p>
+                <div className="flex flex-col items-center gap-4 opacity-20">
+                  <Play className="w-24 h-24" />
+                  <p className="font-headline font-black text-3xl uppercase italic tracking-tighter">Awaiting Delivery</p>
                 </div>
               )}
             </div>
 
+            {isFreeHit && (
+              <div className="absolute top-6 right-6 z-20 bg-primary/20 text-primary border border-primary/30 px-4 py-2 rounded-xl text-sm font-black italic uppercase tracking-tighter animate-pulse flex items-center gap-2">
+                <Zap className="w-4 h-4 fill-primary" /> Free Hit
+              </div>
+            )}
+
             {isGameOver && (
-              <div className="absolute inset-0 z-20 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center space-y-4 p-8 text-center animate-in fade-in zoom-in duration-300">
-                <Trophy className="w-16 h-16 text-accent mb-2" />
-                <h2 className="text-4xl font-headline font-bold">Innings Complete</h2>
-                <p className="text-2xl font-mono text-primary">{score} / {wickets}</p>
-                <p className="text-muted-foreground max-w-xs">
-                  {wickets >= 10 ? "All out!" : "Maximum overs reached."} The innings has come to a close.
-                </p>
-                <Button onClick={resetGame} size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl">
-                  Play Again
-                </Button>
+              <div className="absolute inset-0 z-30 bg-background/95 backdrop-blur-md flex flex-col items-center justify-center p-12 text-center animate-in fade-in zoom-in duration-500">
+                <Trophy className="w-20 h-20 text-accent mb-6 drop-shadow-lg" />
+                <h3 className="text-5xl font-headline font-black italic uppercase tracking-tighter mb-2">Innings Closed</h3>
+                <div className="text-7xl font-headline font-black text-primary mb-6 italic">{score}/{wickets}</div>
+                <p className="text-muted-foreground mb-8 max-w-md font-medium">Final Score after {overs} overs. {wickets >= 10 ? "The team is all out." : "Maximum overs completed."}</p>
+                <Button onClick={resetGame} size="lg" className="h-16 px-12 text-xl font-headline font-black italic rounded-2xl shadow-xl shadow-primary/20">NEW INNINGS</Button>
               </div>
             )}
           </Card>
 
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card className="bg-white/5 border-white/5 p-4 flex flex-col gap-3">
-                <Label className="text-xs uppercase tracking-widest text-muted-foreground">Next Ball Strategy</Label>
-                <Tabs value={strategy} onValueChange={(v) => setStrategy(v as BattingStrategy)} className="w-full">
-                  <TabsList className="grid grid-cols-3 bg-background w-full">
-                    <TabsTrigger value="DEFENSIVE" className="flex items-center gap-2">
-                      <Shield className="w-3 h-3" />
-                      <span className="hidden sm:inline">Defend</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="BALANCED" className="flex items-center gap-2">
-                      <Target className="w-3 h-3" />
-                      <span className="hidden sm:inline">Normal</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="AGGRESSIVE" className="flex items-center gap-2">
-                      <Flame className="w-3 h-3" />
-                      <span className="hidden sm:inline">Attack</span>
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </Card>
+          {/* Action Zone */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="glass-card p-6 border-none shadow-xl">
+              <div className="flex items-center justify-between mb-4">
+                <Label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground flex items-center gap-2">
+                  <Target className="w-3 h-3" /> Batter Intent
+                </Label>
+                <span className="text-[10px] font-bold text-primary uppercase">{strategy}</span>
+              </div>
+              <Tabs value={strategy} onValueChange={v => setStrategy(v as BattingStrategy)}>
+                <TabsList className="grid grid-cols-3 h-12 bg-background p-1 rounded-xl">
+                  <TabsTrigger value="DEFENSIVE" className="rounded-lg data-[state=active]:bg-emerald-500/10 data-[state=active]:text-emerald-400">
+                    <Shield className="w-4 h-4 mr-2" /> <span className="hidden sm:inline">Defend</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="BALANCED" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+                    <Play className="w-4 h-4 mr-2" /> <span className="hidden sm:inline">Auto</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="AGGRESSIVE" className="rounded-lg data-[state=active]:bg-destructive/10 data-[state=active]:text-destructive">
+                    <Flame className="w-4 h-4 mr-2" /> <span className="hidden sm:inline">Attack</span>
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </Card>
 
-              <Card className="bg-white/5 border-white/5 p-4 flex flex-col gap-3">
-                <div className="flex justify-between items-center">
-                  <Label className="text-xs uppercase tracking-widest text-muted-foreground">Balls in Over</Label>
-                  <span className="text-primary font-mono font-bold">{ballsPerOver}</span>
-                </div>
-                <Slider 
-                  value={[ballsPerOver]} 
-                  onValueChange={(v) => setBallsPerOver(v[0])}
-                  min={1}
-                  max={12}
-                  step={1}
-                  className="cursor-pointer"
-                />
-              </Card>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Button 
-                size="lg" 
-                onClick={bowl} 
-                disabled={isGameOver}
-                className="h-20 text-2xl font-headline font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl shadow-primary/20 rounded-2xl group relative overflow-hidden"
-              >
-                <div className="flex items-center gap-3">
-                  <Play className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                  BOWL BALL
-                </div>
-                <span className="absolute bottom-2 right-4 text-[10px] uppercase tracking-tighter opacity-50 hidden md:block">Space</span>
-              </Button>
-              <Button 
-                size="lg" 
-                onClick={simulateOver}
-                disabled={isGameOver}
-                variant="secondary"
-                className="h-20 text-xl font-headline font-bold rounded-2xl border border-white/5 hover:bg-secondary/80 group"
-              >
-                <div className="flex items-center gap-3">
-                  <Activity className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-                  SIMULATE {ballsPerOver} BALLS
-                </div>
-              </Button>
-            </div>
+            <Card className="glass-card p-6 border-none shadow-xl">
+              <div className="flex items-center justify-between mb-4">
+                <Label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground flex items-center gap-2">
+                  <Activity className="w-3 h-3" /> Over Length
+                </Label>
+                <span className="text-[10px] font-bold text-accent uppercase">{ballsPerOver} Balls</span>
+              </div>
+              <div className="pt-2">
+                <Slider value={[ballsPerOver]} onValueChange={v => setBallsPerOver(v[0])} min={1} max={12} step={1} className="[&>span]:bg-accent" />
+              </div>
+            </Card>
           </div>
 
-          <Card className="bg-white/5 border-white/5 overflow-hidden">
-            <CardHeader className="py-4 px-6 flex flex-row items-center justify-between border-b border-white/5">
-              <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Recent Deliveries</CardTitle>
-              <div className="text-xs font-mono text-primary/60">{history.length} balls</div>
-            </CardHeader>
-            <CardContent className="p-4 flex gap-3 overflow-x-auto no-scrollbar">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Button 
+              size="lg" 
+              onClick={bowl} 
+              disabled={isGameOver}
+              className="md:col-span-2 h-20 text-3xl font-headline font-black italic tracking-tighter rounded-2xl shadow-2xl shadow-primary/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              BOWL NOW
+              <span className="ml-4 opacity-30 text-xs not-italic font-sans uppercase hidden md:block">Press Space</span>
+            </Button>
+            <Button 
+              size="lg" 
+              onClick={simulateOver} 
+              disabled={isGameOver}
+              variant="secondary"
+              className="h-20 text-lg font-headline font-black italic tracking-tighter rounded-2xl bg-secondary hover:bg-secondary/80 border border-white/5"
+            >
+              SIM OVER
+            </Button>
+          </div>
+
+        </div>
+
+        {/* Right Column: Stats & History */}
+        <div className="lg:col-span-4 space-y-6">
+          
+          {/* Scoreboard Card */}
+          <Card className="bg-primary p-6 border-none shadow-2xl rounded-[2rem] text-white relative overflow-hidden">
+            <div className="absolute -top-12 -right-12 w-48 h-48 bg-white/10 rounded-full blur-3xl" />
+            
+            <div className="relative z-10 flex flex-col gap-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Total Score</p>
+                  <div className="text-7xl font-headline font-black italic leading-none animate-score-pop">
+                    {score}<span className="text-3xl opacity-40 mx-2 italic">/</span>{wickets}
+                  </div>
+                </div>
+                <Badge className="bg-black/20 text-white border-none text-[10px] py-1 px-3 rounded-full">{matchFormat}</Badge>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white/10 p-4 rounded-2xl">
+                  <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-1">Overs</p>
+                  <p className="text-2xl font-headline font-black italic">{overs}</p>
+                </div>
+                <div className="bg-white/10 p-4 rounded-2xl">
+                  <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-1">Boundaries</p>
+                  <p className="text-2xl font-headline font-black italic text-accent">{boundaries}</p>
+                </div>
+                <div className="bg-white/10 p-4 rounded-2xl">
+                  <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-1">Extras</p>
+                  <p className="text-2xl font-headline font-black italic">{extras}</p>
+                </div>
+                <div className="bg-white/10 p-4 rounded-2xl">
+                  <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-1">Run Rate</p>
+                  <p className="text-2xl font-headline font-black italic">{(balls > 0 ? (score / (balls / 6)).toFixed(2) : "0.00")}</p>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Recent Deliveries */}
+          <Card className="glass-card p-6 border-none shadow-xl">
+            <div className="flex items-center justify-between mb-6">
+              <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <History className="w-3 h-3" /> Recent History
+              </h4>
+              <Badge variant="secondary" className="text-[9px] font-bold">{history.length} Balls</Badge>
+            </div>
+            
+            <div className="flex flex-wrap gap-3">
               {history.length > 0 ? history.map((h, i) => (
                 <div 
                   key={i} 
                   className={cn(
-                    "flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold border transition-all duration-300",
-                    h.isWicket ? "bg-destructive/20 border-destructive text-destructive" :
-                    h.isBoundary ? "bg-accent/20 border-accent text-accent" :
-                    "bg-white/5 border-white/10 text-white"
+                    "w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black transition-all",
+                    h.isWicket ? "bg-destructive text-white scale-110 shadow-lg shadow-destructive/20" :
+                    h.isBoundary ? "bg-accent text-accent-foreground shadow-lg shadow-accent/20" :
+                    h.value === '0' ? "bg-muted text-muted-foreground" :
+                    "bg-secondary text-white border border-white/5"
                   )}
                 >
                   {h.value}
                 </div>
               )) : (
-                <div className="text-muted-foreground/30 text-xs py-2 italic">Waiting for action...</div>
+                <div className="w-full text-center py-8 opacity-20 flex flex-col items-center gap-2">
+                  <Info className="w-6 h-6" />
+                  <p className="text-[10px] uppercase font-bold tracking-widest">No Action Yet</p>
+                </div>
               )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          <Card className="bg-card border-white/5 shadow-xl">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium uppercase tracking-widest text-primary">{matchFormat} Progress</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex justify-between items-baseline">
-                <div className="text-6xl font-headline font-black tracking-tighter animate-number-pop">
-                  {score}<span className="text-3xl text-muted-foreground mx-1">/</span><span className={wickets > 7 ? "text-destructive" : "text-white"}>{wickets}</span>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-white/5 rounded-xl border border-white/5">
-                  <p className="text-[10px] uppercase text-muted-foreground mb-1">Overs</p>
-                  <p className="text-xl font-headline font-bold">
-                    {overs}.{ballsInOver}
-                    {matchFormat !== 'TEST' && <span className="text-xs text-muted-foreground ml-1">/ {currentConfig.maxOvers}</span>}
-                  </p>
-                </div>
-                <div className="p-3 bg-white/5 rounded-xl border border-white/5">
-                  <p className="text-[10px] uppercase text-muted-foreground mb-1">Extras</p>
-                  <p className="text-xl font-headline font-bold">{extras}</p>
-                </div>
-                <div className="p-3 bg-white/5 rounded-xl border border-white/5">
-                  <p className="text-[10px] uppercase text-muted-foreground mb-1">Boundaries</p>
-                  <p className="text-xl font-headline font-bold">{boundaries}</p>
-                </div>
-                <div className="p-3 bg-white/5 rounded-xl border border-white/5">
-                  <p className="text-[10px] uppercase text-muted-foreground mb-1">Strike Rate</p>
-                  <p className="text-xl font-headline font-bold">{strikeRate}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/5 border-white/5">
-            <CardHeader className="py-4">
-              <CardTitle className="text-xs uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-                <Info className="w-3 h-3" />
-                Current Strategy
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 pb-6">
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Batter Aggression</span>
-                  <span className={cn(
-                    "font-mono font-bold",
-                    strategy === 'AGGRESSIVE' ? "text-destructive" : strategy === 'DEFENSIVE' ? "text-accent" : "text-primary"
-                  )}>
-                    {strategy}
-                  </span>
-                </div>
-                <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                  <div className={cn(
-                    "h-full transition-all duration-500",
-                    strategy === 'AGGRESSIVE' ? "bg-destructive" : strategy === 'DEFENSIVE' ? "bg-accent" : "bg-primary"
-                  )} style={{ width: strategy === 'AGGRESSIVE' ? '100%' : strategy === 'BALANCED' ? '50%' : '15%' }}></div>
-                </div>
-              </div>
-              <p className="text-[10px] text-muted-foreground italic leading-relaxed">
-                {strategy === 'AGGRESSIVE' ? "Batter will swing for the fences. Wicket risk is significantly higher." : 
-                 strategy === 'DEFENSIVE' ? "Batter focuses on protecting their wicket. Boundary probability is very low." : 
-                 "Batter will play a standard balanced game according to the match format."}
-              </p>
-            </CardContent>
-          </Card>
-
-          <div className="p-4 bg-primary/10 border border-primary/20 rounded-2xl flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-              <User className="w-6 h-6 text-primary" />
             </div>
-            <div>
-              <p className="text-xs text-primary font-bold uppercase tracking-widest">Active Plan</p>
-              <h4 className="font-headline font-bold text-lg">
-                {strategy === 'AGGRESSIVE' ? 'Slog Mode' : strategy === 'DEFENSIVE' ? 'Anchor In' : 'Steady Builder'}
-              </h4>
+            
+            {history.length > 0 && (
+              <Button variant="ghost" className="w-full mt-6 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-white" onClick={() => setHistory([])}>
+                Clear Session
+              </Button>
+            )}
+          </Card>
+
+          {/* Strategy Insight */}
+          <Card className="glass-card p-6 border-none shadow-xl border-l-4 border-accent">
+            <div className="flex gap-4 items-start">
+              <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+                <Flame className="w-5 h-5 text-accent" />
+              </div>
+              <div>
+                <h5 className="text-[11px] font-black uppercase tracking-widest mb-1">Tactical Update</h5>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {strategy === 'AGGRESSIVE' ? "Aggression levels high. Expect big boundaries but be wary of the increased risk of mistimed shots." : 
+                   strategy === 'DEFENSIVE' ? "Playing for time. Defensive stance will lower scoring rate but significantly preserve your wickets." : 
+                   "Balanced approach. Searching for gaps and taking singles while keeping the scoreboard moving steadily."}
+                </p>
+                <div className="mt-3 flex items-center gap-1 text-[10px] font-bold text-accent uppercase group cursor-pointer">
+                  Learn More <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
             </div>
-          </div>
+          </Card>
+
         </div>
       </main>
 
-      <footer className="mt-auto pt-12 pb-8 w-full max-w-5xl text-center text-muted-foreground text-xs uppercase tracking-[0.3em]">
-        <p>&copy; 2024 PitchPulse Studio &bull; Custom Engine Activated</p>
+      <footer className="mt-20 text-center space-y-2 px-4">
+        <div className="text-[10px] font-black uppercase tracking-[0.4em] text-muted-foreground/40">
+          Engineered for PitchPulse Studio &bull; v2.0 Redesign
+        </div>
+        <div className="flex justify-center gap-6 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/30">
+          <span>Terms</span>
+          <span>Privacy</span>
+          <span>Sim Logic</span>
+        </div>
       </footer>
     </div>
   );
