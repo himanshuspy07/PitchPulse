@@ -1,6 +1,8 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { 
   Trophy, 
   Settings, 
@@ -12,8 +14,7 @@ import {
   Info,
   Shield,
   Flame,
-  Target,
-  ChevronRight
+  Target
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +43,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PlaceHolderImages } from "@/app/lib/placeholder-images";
 
 export default function PitchPulse() {
   const [matchFormat, setMatchFormat] = useState<MatchFormat>('T20');
@@ -63,6 +65,11 @@ export default function PitchPulse() {
     wicket: null,
     extra: null
   });
+
+  // Safely find the pitch image or fallback to the first available image, or null
+  const pitchImage = (PlaceHolderImages && PlaceHolderImages.length > 0) 
+    ? (PlaceHolderImages.find(img => img.id === 'cricket-pitch') || PlaceHolderImages[0])
+    : null;
 
   const bowl = useCallback(() => {
     if (isGameOver) return;
@@ -247,8 +254,20 @@ export default function PitchPulse() {
 
       <main className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-3 gap-8 z-10">
         <div className="lg:col-span-2 space-y-8">
-          <Card className="bg-gradient-to-br from-card to-background border-white/5 shadow-2xl relative overflow-hidden h-[300px] flex items-center justify-center">
-            <div className="absolute inset-0 opacity-10 pointer-events-none">
+          <Card className="bg-card border-white/5 shadow-2xl relative overflow-hidden h-[300px] flex items-center justify-center">
+            {pitchImage && (
+              <div className="absolute inset-0 z-0 opacity-20 transition-opacity duration-1000">
+                <Image 
+                  src={pitchImage.imageUrl} 
+                  alt={pitchImage.description}
+                  fill
+                  className="object-cover"
+                  data-ai-hint={pitchImage.imageHint}
+                />
+              </div>
+            )}
+            
+            <div className="absolute inset-0 z-0 opacity-10 pointer-events-none">
               <svg className="w-full h-full" viewBox="0 0 100 100">
                 <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
                   <path d="M 10 0 L 0 0 0 10" fill="none" stroke="white" strokeWidth="0.5"/>
@@ -257,37 +276,39 @@ export default function PitchPulse() {
               </svg>
             </div>
 
-            {lastResult ? (
-              <div className="text-center space-y-4 animate-number-pop">
-                <div className={cn(
-                  "text-9xl font-headline font-black tracking-tighter drop-shadow-2xl",
-                  lastResult.isWicket ? "text-destructive" : "text-primary",
-                  lastResult.isBoundary ? "text-accent" : ""
-                )}>
-                  {lastResult.value}
-                </div>
-                <p className="text-xl text-muted-foreground font-medium uppercase tracking-widest">
-                  {lastResult.isWicket ? lastResult.wicketType : 
-                   lastResult.extraType ? lastResult.extraType : 
-                   lastResult.isBoundary ? "Spectacular Boundary!" : "Clean Delivery"}
-                </p>
-                {isFreeHit && (
-                  <div className="inline-flex items-center gap-2 bg-accent/20 text-accent px-4 py-1.5 rounded-full text-sm font-bold uppercase animate-pulse">
-                    <Zap className="w-4 h-4 fill-accent" />
-                    Free Hit
+            <div className="relative z-10 w-full">
+              {lastResult ? (
+                <div className="text-center space-y-4 animate-number-pop">
+                  <div className={cn(
+                    "text-9xl font-headline font-black tracking-tighter drop-shadow-2xl",
+                    lastResult.isWicket ? "text-destructive" : "text-primary",
+                    lastResult.isBoundary ? "text-accent" : ""
+                  )}>
+                    {lastResult.value}
                   </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center space-y-4 text-muted-foreground/30">
-                <Play className="w-20 h-20 mx-auto" />
-                <p className="text-xl font-headline uppercase tracking-widest">Awaiting First Ball</p>
-                <p className="text-xs uppercase tracking-widest">Format: {matchFormat}</p>
-              </div>
-            )}
+                  <p className="text-xl text-muted-foreground font-medium uppercase tracking-widest">
+                    {lastResult.isWicket ? lastResult.wicketType : 
+                    lastResult.extraType ? lastResult.extraType : 
+                    lastResult.isBoundary ? "Spectacular Boundary!" : "Clean Delivery"}
+                  </p>
+                  {isFreeHit && (
+                    <div className="inline-flex items-center gap-2 bg-accent/20 text-accent px-4 py-1.5 rounded-full text-sm font-bold uppercase animate-pulse">
+                      <Zap className="w-4 h-4 fill-accent" />
+                      Free Hit
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center space-y-4 text-muted-foreground/30">
+                  <Play className="w-20 h-20 mx-auto" />
+                  <p className="text-xl font-headline uppercase tracking-widest">Awaiting First Ball</p>
+                  <p className="text-xs uppercase tracking-widest">Format: {matchFormat}</p>
+                </div>
+              )}
+            </div>
 
             {isGameOver && (
-              <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center space-y-4 p-8 text-center animate-in fade-in zoom-in duration-300">
+              <div className="absolute inset-0 z-20 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center space-y-4 p-8 text-center animate-in fade-in zoom-in duration-300">
                 <Trophy className="w-16 h-16 text-accent mb-2" />
                 <h2 className="text-4xl font-headline font-bold">Innings Complete</h2>
                 <p className="text-2xl font-mono text-primary">{score} / {wickets}</p>
